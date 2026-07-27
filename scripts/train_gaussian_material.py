@@ -1,5 +1,5 @@
 """
-train_gaussian_material.py  ·  可微材质向量嵌入高斯（开题核心创新，PGSR 之上）
+train_gaussian_material.py  ·  可微材质向量嵌入高斯（PGSR 之上）
 
 方法：给训练好的每个 3D 高斯挂一个 K 维材质向量 material[N,K]（learnable）。
 渲染时用 PGSR render() 的 override_color 钩子，把材质向量当"颜色"按每 3 通道一组

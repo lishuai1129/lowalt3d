@@ -1,10 +1,10 @@
 """
-gaussian_to_mesh_material.py  ·  可微高斯材质 → 网格面片（开题 §12 kNN 加权投票）
+gaussian_to_mesh_material.py  ·  可微高斯材质 → 网格面片（ kNN 加权投票）
 
 目的：把 train_gaussian_material.py 学出的每高斯材质向量，迁移到 PGSR 提取的三角面片上，
       生成通信仿真用的 face_materials.csv（与"直接投票版"同格式，可对比）。
 
-原理（开题 §12）：对每个三角面片取中心 → kNN 找邻近高斯 → 以 不透明度×距离衰减 加权
+原理：对每个三角面片取中心 → kNN 找邻近高斯 → 以 不透明度×距离衰减 加权
       平均其材质概率 → argmax 得面片材质 → 按 ITU-R P.2040 映射电磁参数。
 
 运行（在 E:\lowalt3d 下）：
