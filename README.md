@@ -99,7 +99,7 @@ python scripts\export_gltf_ue.py --material_ply outputs\%SCENE%_pgsr\material_ga
 | `visualize_sim.py` | 路损/视距/射线 3D 可视化 |
 | `material_common.py` | 共用：类别表 / 电磁参数 / 调色板 |
 
-## 已知要点（详见通用流程文档"常见坑速查"）
+## 已知要点
 
 - **InSite 请加载 `scene.city`**：其 COLLADA 导入器会把多材质合并成单一材质，`.city` 为逐面片材质索引的原生格式；
 - 模型躺平/尺寸不对 → 导出时加 `--geo_transform`；地面悬在 z≈-80 → 加 `--ground_z0`；
