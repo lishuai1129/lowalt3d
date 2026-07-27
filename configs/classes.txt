@@ -1,0 +1,7 @@
+background
+vegetation
+ground_road
+concrete
+roof
+glass
+metal

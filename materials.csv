@@ -1,0 +1,9 @@
+﻿material_id,material_name,conductivity,permittivity,roughness,thickness,source_id,source_file,local_material_id,model,sample_frequency_hz
+0,Concrete,0.015,7,0,0.3,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,0,LayeredDielectric,
+1,Asphalt 1 GHz,0.0005,5.72,0,0.3,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,1,DielectricHalfspace,
+2,Brick,0.001,4.44,0,0.125,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,2,LayeredDielectric,
+3,Dry Earth,0.001,4,0,0,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,3,DielectricHalfspace,
+4,Glass,0,2.4,0,0.003,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,4,LayeredDielectric,
+5,Wood,0,5,0,0.03,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,5,LayeredDielectric,
+6,Metal,,,0,0,0,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\11.city,7,,
+7,Dry earth,0.001,4,0,0,1,C:\project\Radio-Frequency-Diffusion\test_data\test9\5.8G\vv\faces\1.ter,2,DielectricHalfspace,

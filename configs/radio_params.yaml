@@ -1,0 +1,49 @@
+# 电磁参数表（ITU-R P.2040 近似值）· 折中统一类别体系（方向 A）
+# 类别顺序须与 configs/classes.txt 及 2D 分割输出通道一致。
+# 频率暂用单一 3.5 GHz；后续可扩为 2.4/3.5/5.8 三频段(开题要求)。
+
+frequency_mhz: 3500
+tx_power_dbm: 23
+tx_gain_dbi: 0
+rx_gain_dbi: 0
+rx_height_m: 1.5
+grid_spacing_m: 10
+
+class_order:
+  - background
+  - vegetation
+  - ground_road
+  - concrete
+  - roof
+  - glass
+  - metal
+
+materials:
+  background:                       # 不确定/天空/人车杂物 → 视作自由空间
+    eps_r: 1.0
+    sigma: 0.0
+    penetration_loss_db: 0.0
+  vegetation:                       # 植被(树/草) → 叶簇穿透损耗
+    eps_r: 1.5
+    sigma: 0.05
+    penetration_loss_db: 6.0
+  ground_road:                      # 地面/道路(沥青/土) → 近不透
+    eps_r: 8.0
+    sigma: 0.02
+    penetration_loss_db: 30.0
+  concrete:                         # 混凝土墙/硬化面
+    eps_r: 5.31
+    sigma: 0.0326
+    penetration_loss_db: 12.0
+  roof:                             # 屋顶(混合，取混凝土/瓦近似)
+    eps_r: 4.0
+    sigma: 0.01
+    penetration_loss_db: 8.0
+  glass:                            # 玻璃幕墙/窗
+    eps_r: 6.27
+    sigma: 0.0043
+    penetration_loss_db: 4.0
+  metal:                            # 金属屋顶/幕墙 → 近全反射
+    eps_r: 1.0
+    sigma: 1.0e7
+    penetration_loss_db: 40.0

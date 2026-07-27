@@ -1,0 +1,29 @@
+# ---- 大数据 / 可再生产物（不入库）----
+data/
+outputs/
+experiments/
+checkpoints/
+
+# ---- 第三方仓库与二进制工具（自行 clone/下载，见 README）----
+repos/
+tools/
+
+# ---- 个人材料 / 过程记录 ----
+docs/开题报告*.docx
+docs/记录/
+docs/场景2/
+
+# ---- 缓存 ----
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ---- 大文件兜底 ----
+*.ply
+*.city
+*.dae
+*.glb
+*.pt
+*.pth
+*.npz
+*.cache
