@@ -108,5 +108,5 @@ python scripts\export_gltf_ue.py --material_ply outputs\%SCENE%_pgsr\material_ga
 
 ## 许可与致谢
 
-依赖并致谢开源项目 [PGSR](https://github.com/zju3dv/PGSR)、[COLMAP](https://colmap.github.io/)、Open3D、pycollada。
+依赖并致谢开源项目 [PGSR](https://github.com/zju3dv/PGSR)、[COLMAP](https://colmap.github.io/)、Open3D、pycollada 以及无人机数据集 [UrbanScene3D](https://github.com/Linxius/UrbanScene3D)。
 电磁参数取自 ITU-R P.2040 建议书。
