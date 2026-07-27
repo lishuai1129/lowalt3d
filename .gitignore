@@ -27,3 +27,7 @@ __pycache__/
 *.pth
 *.npz
 *.cache
+
+# ---- 文档与参考表（不入库）----
+docs/
+materials.csv
