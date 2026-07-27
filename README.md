@@ -40,9 +40,8 @@
 
 ## 快速开始
 
-把无人机原图（保留 GPS EXIF）放到 `data\<场景名>\input\`，然后按
-**[docs/通用流程文档_换场景复用.md](docs/通用流程文档_换场景复用.md)** 从上到下执行——
-全流程已参数化，换场景只改一个 `SCENE` 变量。核心步骤速览：
+把无人机原图（保留 GPS EXIF）放到 `data\<场景名>\input\`，按下列步骤从上到下执行——
+全流程已参数化，换场景只改一个 `SCENE` 变量：
 
 ```cmd
 set SCENE=myscene
@@ -79,9 +78,7 @@ python scripts\export_gltf_ue.py --material_ply outputs\%SCENE%_pgsr\material_ga
 |---|---|
 | `scripts/` | 全部管线脚本（见下表） |
 | `configs/` | `classes.txt` 材质类别、`radio_params.yaml` P.2040 电磁参数表 |
-| `docs/` | 流程/执行手册（**通用流程文档**为主入口，含常见坑速查表） |
 | `ue/` | UE C++ 射线追踪器 `RFRayTracer.{h,cpp}` |
-| `materials.csv` | Wireless InSite 材质参数参考表 |
 | `data/` `outputs/` | 场景输入/输出（不入库，运行时生成） |
 | `repos/` `tools/` | PGSR / COLMAP（不入库，自行获取） |
 
