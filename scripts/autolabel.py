@@ -24,12 +24,11 @@ from material_common import _PALETTE, _DEFAULT_CLASS_ORDER
 # ADE20K 标签名 关键词 → 我们的类别（可按复核结果调整）
 _KEYWORDS = {
     "vegetation":  ["tree", "grass", "plant", "palm", "flower", "bush", "hedge", "forest", "field"],
-    "ground_road": ["road", "sidewalk", "pavement", "path", "earth", "ground",
+    "asphalt":     ["road", "sidewalk", "pavement", "path", "earth", "ground",
                     "sand", "dirt", "soil", "runway", "land"],
-    "concrete":    ["building", "wall", "house", "edifice", "skyscraper"],
-    "roof":        ["roof"],
+    "concrete":    ["building", "wall", "house", "edifice", "skyscraper", "roof"],
     "glass":       ["window", "windowpane", "glass"],
-    # 其余(sky/person/car/water/...) → background
+    # 其余(sky/person/car/water/...) → background；roof 归 concrete（材质体系 v2 无 roof 类）
 }
 
 

@@ -155,7 +155,7 @@ def main():
     def insite_model(cls, p):
         if cls == "metal":
             return "PEC"
-        if cls in ("ground_road",):
+        if cls in ("asphalt",):
             return "DielectricHalfspace"
         return "LayeredDielectric"
     csv_path = os.path.join(args.out_dir, "ue_materials.csv")

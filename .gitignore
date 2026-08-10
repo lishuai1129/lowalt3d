@@ -31,3 +31,8 @@ __pycache__/
 # ---- 文档与参考表（不入库）----
 docs/
 materials.csv
+
+# SQLite 临时/WAL 残留(工具生成,勿入库)
+*.db
+*.db-shm
+*.db-wal

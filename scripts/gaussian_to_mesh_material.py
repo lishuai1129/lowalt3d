@@ -34,6 +34,9 @@ def main():
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--k", type=int, default=8, help="每面片取最近的 k 个高斯")
     ap.add_argument("--chunk", type=int, default=1000000, help="面片分块(控内存)")
+    ap.add_argument("--use_normal", action="store_true", help="kNN 权重叠加高斯↔面片法向一致度")
+    ap.add_argument("--crop_bbox", default=None,
+                    help="只用此框内高斯(须与 train 的 --crop_bbox 同框):xmin,ymin,zmin,xmax,ymax,zmax")
     args = ap.parse_args()
 
     import torch, open3d as o3d
@@ -48,6 +51,12 @@ def main():
     g = GaussianModel(3); g.load_ply(args.gaussian_ply)
     xyz = g.get_xyz.detach().cpu().numpy().astype(np.float64)
     op = g.get_opacity.detach().cpu().numpy()[:, 0].astype(np.float64)      # sigmoid后
+    keep_bbox = None
+    if args.crop_bbox:
+        v = list(map(float, args.crop_bbox.split(",")))
+        keep_bbox = ((xyz >= np.array(v[:3])) & (xyz <= np.array(v[3:]))).all(1)
+        xyz = xyz[keep_bbox]; op = op[keep_bbox]
+        print(f"裁剪高斯(只留建筑区,须与训练同框): {len(keep_bbox)} → {int(keep_bbox.sum())}")
     mat = torch.load(args.material_pt, map_location="cpu")                  # [N,K]
     prob = torch.softmax(mat.float(), dim=1).numpy().astype(np.float32)     # [N,K]
     assert prob.shape[0] == xyz.shape[0] == len(op), "高斯数不一致"
@@ -61,9 +70,25 @@ def main():
     centers = V[Tri].mean(axis=1)                                          # [F,3]
     print(f"面片数 F={nF}")
 
+    # 软混合(幕墙=玻璃占比×εr)用的电磁向量 + (可选)高斯/面片法向
+    eps_vec = np.array([em.get(n, {}).get("eps_r", 1.0) for n in class_order], np.float64)
+    sig_vec = np.array([em.get(n, {}).get("sigma", 0.0) for n in class_order], np.float64)
+    metal_i = class_order.index("metal") if "metal" in class_order else -1
+    if args.use_normal:
+        mesh.compute_triangle_normals(normalized=True)
+        fn = np.asarray(mesh.triangle_normals)                             # [F,3]
+        from utils.general_utils import build_rotation
+        Rg = build_rotation(g.get_rotation.detach())
+        ax = g.get_scaling.detach().argmin(1)
+        ng = torch.gather(Rg, 2, ax.view(-1, 1, 1).expand(-1, 3, 1)).squeeze(2)
+        ng = torch.nn.functional.normalize(ng, dim=1).cpu().numpy()        # [N,3]
+        if keep_bbox is not None:
+            ng = ng[keep_bbox]
+
     # ---- kNN 加权投票(分块) ----
     tree = cKDTree(xyz)
     face_mat = np.empty(nF, np.int64)
+    eps_mix = np.empty(nF, np.float64); sig_mix = np.empty(nF, np.float64)
     for s in range(0, nF, args.chunk):
         e = min(s + args.chunk, nF)
         dist, idx = tree.query(centers[s:e], k=args.k)                     # [c,k]
@@ -71,19 +96,28 @@ def main():
             dist = dist[:, None]; idx = idx[:, None]
         sig = dist.mean(1, keepdims=True) + 1e-9
         w = op[idx] * np.exp(-(dist / sig) ** 2)                           # [c,k] 不透明度×距离衰减
+        if args.use_normal:
+            w = w * (0.5 + 0.5 * np.abs((ng[idx] * fn[s:e][:, None, :]).sum(-1)))  # +法向一致度
         fp = (w[:, :, None] * prob[idx]).sum(1) / (w.sum(1, keepdims=True) + 1e-9)  # [c,K]
         face_mat[s:e] = fp.argmax(1)
+        # 软混合电磁参数：金属需>0.5才计其巨σ(否则整面被拉成导体)
+        fps = fp.copy()
+        if metal_i >= 0:
+            fps[fps[:, metal_i] < 0.5, metal_i] = 0.0
+        fps = fps / (fps.sum(1, keepdims=True) + 1e-9)
+        eps_mix[s:e] = (fps * eps_vec).sum(1); sig_mix[s:e] = (fps * sig_vec).sum(1)
         print(f"  面片 {e}/{nF}")
 
     # ---- 导出 CSV(与直接投票版同格式) ----
     os.makedirs(args.out_dir, exist_ok=True)
     csv_path = os.path.join(args.out_dir, "face_materials.csv")
     with open(csv_path, "w") as f:
-        f.write("face_id,material_id,material_name,eps_r,sigma,penetration_loss_db\n")
+        f.write("face_id,material_id,material_name,eps_r,sigma,penetration_loss_db,eps_r_mix,sigma_mix\n")
         for i in range(nF):
             name = class_order[face_mat[i]]; p = em.get(name, {})
             f.write(f"{i},{face_mat[i]},{name},{p.get('eps_r',1.0)},"
-                    f"{p.get('sigma',0.0)},{p.get('penetration_loss_db',0.0)}\n")
+                    f"{p.get('sigma',0.0)},{p.get('penetration_loss_db',0.0)},"
+                    f"{eps_mix[i]:.4f},{sig_mix[i]:.6g}\n")
     print(f"[导出] {csv_path}")
 
     # ---- 上色网格(顶点=相邻面片材质众数) ----

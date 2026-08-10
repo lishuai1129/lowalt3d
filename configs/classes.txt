@@ -1,7 +1,6 @@
 background
 vegetation
-ground_road
+asphalt
 concrete
-roof
 glass
 metal

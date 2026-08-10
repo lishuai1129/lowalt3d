@@ -5,8 +5,8 @@ export_dae.py  ·  材质网格 → Wireless InSite 用的 .dae（面片按材�
       面片按【InSite 材质名】分组绑定，射线命中即知材质；并附一份 InSite 格式材质表。
 
 我们的类 → InSite 材质映射(用参考 materials.csv 的值)：
-      concrete→Concrete, ground_road→Asphalt, glass→Glass, metal→Metal(PEC),
-      roof→Concrete(近似), vegetation→Wood(近似,InSite 无植被), background→Concrete(兜底)
+      concrete→Concrete, asphalt→Asphalt, glass→Glass, metal→Metal(PEC),
+      vegetation→Wood(近似,InSite 无植被), background→Concrete(兜底)
 
 依赖：pip install pycollada
 运行：
@@ -24,17 +24,19 @@ import os, sys, argparse
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from material_common import _DEFAULT_CLASS_ORDER
 
 # 我们的类 → (InSite 材质名, 电导率σ, 相对介电εr, 粗糙度, 厚度m, 模型, 颜色RGB)
 INSITE_MAP = {
     "concrete":    ("Concrete", 0.015,  7.0,  0.0, 0.3,   "LayeredDielectric",   (0.72, 0.72, 0.72)),
-    "ground_road": ("Asphalt",  0.0005, 5.72, 0.0, 0.3,   "DielectricHalfspace", (0.30, 0.30, 0.30)),
+    "asphalt":     ("Asphalt",  0.0005, 5.72, 0.0, 0.3,   "DielectricHalfspace", (0.30, 0.30, 0.30)),
     "glass":       ("Glass",    0.0,    2.4,  0.0, 0.003, "LayeredDielectric",   (0.35, 0.60, 0.90)),
     "metal":       ("Metal",    None,   None, 0.0, 0.0,   "PEC",                 (0.90, 0.72, 0.20)),
-    "roof":        ("Concrete", 0.015,  7.0,  0.0, 0.3,   "LayeredDielectric",   (0.72, 0.72, 0.72)),
     "vegetation":  ("Wood",     0.0,    5.0,  0.0, 0.03,  "LayeredDielectric",   (0.40, 0.62, 0.32)),
     "background":  ("Concrete", 0.015,  7.0,  0.0, 0.3,   "LayeredDielectric",   (0.72, 0.72, 0.72)),
 }
+assert set(INSITE_MAP) >= set(_DEFAULT_CLASS_ORDER), \
+    f"INSITE_MAP 缺类(会静默落到 background→Concrete): {set(_DEFAULT_CLASS_ORDER) - set(INSITE_MAP)}"
 
 
 def write_city(path, V, T, face_insite_names, used, name2params):

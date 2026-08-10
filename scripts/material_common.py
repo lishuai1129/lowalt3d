@@ -8,19 +8,18 @@ material_common.py · 当前毕设主线共用：材质类别 / ITU-R P.2040 电
 import os
 import numpy as np
 
-# 类别顺序（折中统一体系，与 configs/classes.txt 一致）
+# 类别顺序（材质体系 v2：6 类，drop roof，ground_road→asphalt；三文件须一致）
 _DEFAULT_CLASS_ORDER = [
-    "background", "vegetation", "ground_road",
-    "concrete", "roof", "glass", "metal",
+    "background", "vegetation", "asphalt",
+    "concrete", "glass", "metal",
 ]
 
 # 各类别 ITU-R P.2040 近似电磁参数（缺 yaml 时的内置回退）
 _DEFAULT_EM = {
     "background":  dict(eps_r=1.0,  sigma=0.0,    penetration_loss_db=0.0),
     "vegetation":  dict(eps_r=1.5,  sigma=0.05,   penetration_loss_db=6.0),
-    "ground_road": dict(eps_r=8.0,  sigma=0.02,   penetration_loss_db=30.0),
+    "asphalt":     dict(eps_r=8.0,  sigma=0.02,   penetration_loss_db=30.0),
     "concrete":    dict(eps_r=5.31, sigma=0.0326, penetration_loss_db=12.0),
-    "roof":        dict(eps_r=4.0,  sigma=0.01,   penetration_loss_db=8.0),
     "glass":       dict(eps_r=6.27, sigma=0.0043, penetration_loss_db=4.0),
     "metal":       dict(eps_r=1.0,  sigma=1e7,    penetration_loss_db=40.0),
 }
@@ -29,9 +28,8 @@ _DEFAULT_EM = {
 _PALETTE = np.array([
     [128, 128, 128],   # background  灰
     [ 60, 170,  70],   # vegetation  绿
-    [ 90,  90,  90],   # ground_road 深灰
+    [ 90,  90,  90],   # asphalt     深灰
     [200, 200, 200],   # concrete    浅灰
-    [220,  80,  60],   # roof        红
     [ 80, 160, 230],   # glass       蓝
     [230, 180,  60],   # metal       橙黄
 ], dtype=np.uint8)
