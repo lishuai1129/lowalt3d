@@ -16,8 +16,12 @@ downscale_images.py  ·  把去畸变原图预先降采样到磁盘，供【大�
 填 4 才会算出与本脚本一致的目标尺寸，使训练时的 resize 成为空操作；若填 1 会把小图
 放大回原始 45MP）：
   python train.py -s ..\..\data\scene03 -m ..\..\outputs\scene03_pgsr_hq ^
-      -i images_4 -r 4 --iterations 30000 --ncc_scale 0.5 ^
-      --max_all_points 3000000 --max_abs_split_points 0 --opacity_cull_threshold 0.05
+      -i images_4 -r 4 --iterations 30000 --data_device cpu
+
+（旧版这里曾示范 `--ncc_scale 0.5 --max_all_points 3000000 --max_abs_split_points 0
+  --opacity_cull_threshold 0.05`，四个都别再抄：前者是【除数】，0.5 会把 NCC 图上采样 4× 更吃显存；
+  后三个是压显存旋钮，方向全反，拿植被/薄结构完整度换显存。见 场景2_优化方案_完整版 §0.1。
+  大场景显存不够走分块：scripts\split_scene.py）
 
 注意：文件名必须与 COLMAP 记录一致（含扩展名），本脚本原样保留。
 """

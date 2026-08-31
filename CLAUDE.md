@@ -92,6 +92,26 @@ rules label shadow/dark ground as glass (recall ≈ 0 on aerial); do not resurre
 - So the robust chain is: `detect(0.15+min_win_px)` → `train_gaussian_material --lambda_gate` →
   `gaussian_to_mesh_material` → `smooth --geo_gate --min_win_area` → `label_windows_geom` → export.
 
+**Large scenes are split into blocks, trained separately, then merged back into one Gaussian
+set.** `split_scene.py` → per-block PGSR train → `merge_blocks.py` → one `point_cloud.ply` →
+normal TSDF/material/export chain, unchanged. The point is *not* "it OOMs otherwise" — it is
+that a single run forces `--max_all_points 3000000 --max_abs_split_points 0
+--opacity_cull_threshold 0.05`, which trade vegetation/thin-structure completeness for VRAM.
+N blocks = N × the 6M Gaussian budget at PGSR defaults.
+- **Iron rule: exactly one global SfM.** Per-block COLMAP yields mutually incompatible
+  coordinate frames and cannot be merged.
+- Partitioning happens in **ENU meters** (reuses `georeference.py`'s `get_gps` /
+  `geodetic_to_enu` / `umeyama`), so up is +U and block sizes are given in meters. VastGaussian's
+  four steps: camera-**count**-balanced grid → `core`/`expanded` boxes → cameras selected by
+  center-in-expanded ∪ visibility ≥ `--vis_thresh` → points in expanded. Merge keeps only
+  Gaussians whose center is in that block's **core**, so the overlap is cut exactly once.
+- **PGSR needs no changes**: each block's `cameras_extent` is recomputed by `getNerfppNorm` from
+  that block's own cameras. Blocks are COLMAP *text* sub-models (`sparse/*.txt`) with the 2D
+  observation table left empty — PGSR reads only extrinsics/intrinsics + point coords. `-i`
+  takes a relative `../../images_2` so the image set is shared, not copied per block.
+- Don't reach for `colmap model_cropper`/`model_splitter`: measured on scene02, cropping to 55%
+  of points still retains **674/678 images** (it keeps any image observing ≥1 retained point).
+
 **Coordinate systems are the main footgun.** COLMAP world coordinates are arbitrary
 units/orientation. `georeference.py` solves a **Umeyama similarity transform** (scale+R+t)
 between COLMAP camera centers and GPS-EXIF ENU meters, emitting `geo_transform.json`. Downstream:
@@ -118,7 +138,28 @@ onto the Python grid and reports RMSE / correlation.
   InSite output — preserve its exact keyword structure if editing.
 - Model lying flat / wrong size on export → pass `--geo_transform`. Ground floating at z≈-80
   (ENU origin is at drone altitude) → add `--ground_z0` (pure translation, path loss unaffected).
-- OOM during PGSR training → lower resolution `-r 4` → `-r 8`.
+- **PGSR VRAM must be judged at iteration 7000+, not before.** Both geometric regularizers
+  (`single_view_weight_from_iter` / `multi_view_weight_from_iter`) switch on at 7000; before
+  that a run looks cheap and then falls off a cliff. Once over budget it does not merely slow —
+  it spills to shared memory and thrashes over PCIe (100×+, never recovers).
+- Budget ≈ **pixels-per-image × geometric-regularizer buffers + Gaussian count**; both terms
+  matter and either can blow it alone. Measured on 16 GB: scene03 `-r 2` block (11.36 Mpx/img)
+  died at only **2.85M** Gaussians; scene03 `-r 8` whole-scene (0.71 Mpx/img) sailed through
+  7000 at 3.4 it/s but degraded to 1.97 s/it once densification reached **5.3M**. So blocking
+  (which cuts Gaussians per block) and lowering `-r` (which cuts pixels) fix *different* halves —
+  diagnose which term is dominant before picking.
+- `--ncc_scale` is a **divisor** (`cameras.py:39`: `ncc_resolution = resolution / ncc_scale`),
+  so `0.5` *upsamples* the NCC image 4× in pixels. Leave it at `1.0`.
+- `-i` is joined onto `source_path`, so its depth must match: `../../images_4` from a block dir
+  (`data/<scene>/blocks/bXX`), plain `images_4` when `-s` is the scene root.
+- OOM during PGSR training: the two causes need different fixes. Too many *Gaussians* (or a
+  scene too big to densify at defaults) → `split_scene.py`, never the
+  `--max_all_points`/`--max_abs_split_points 0`/`--opacity_cull_threshold 0.05` trio, which buys
+  VRAM with vegetation and thin-structure completeness. Too many *pixels per image* → lower
+  `-r`; blocking cannot help there.
+- PGSR's `convert.py` shells out via `os.system` → cmd.exe: pass `--data_path` /
+  `--colmap_executable` as **absolute paths with backslashes**, or it dies with
+  `'..' 不是内部或外部命令`.
 - Georeference needs ≥3 GPS-tagged images; residual >5 m means consumer-GPS noise (use RTK/GCP).
 - Heavy geometry libs (torch, open3d, trimesh, collada, cv2) are imported *inside* `main()`, not
   at module top, so `--help` stays fast and import errors are localized — follow this pattern.
