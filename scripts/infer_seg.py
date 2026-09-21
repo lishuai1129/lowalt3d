@@ -38,8 +38,9 @@ def main():
         from material_common import _PALETTE
         os.makedirs(args.out + "_color", exist_ok=True)
 
-    imgs = sorted(sum([glob.glob(os.path.join(args.images, e))
-                       for e in ("*.JPG", "*.jpg", "*.png", "*.PNG")], []))
+    imgs = sorted({os.path.normcase(os.path.abspath(p)): p
+                   for e in ("*.JPG", "*.jpg", "*.png", "*.PNG")
+                   for p in glob.glob(os.path.join(args.images, e))}.values())
     print(f"推理 {len(imgs)} 张 ...")
     for k, ip in enumerate(imgs):
         im0 = cv2.cvtColor(cv2.imread(ip), cv2.COLOR_BGR2RGB); H, W = im0.shape[:2]

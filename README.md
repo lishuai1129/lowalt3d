@@ -1,4 +1,8 @@
 # lowalt3d — 无人机影像 → 材质感知 3DGS → 电磁三维地图 → 射线路损仿真
+conda deactivate
+conda activate D:\condaenvs\emmap
+colmap -h
+
 
 从无人机航拍照片出发，重建带**电磁材质属性**（ITU-R P.2040）的三维场景模型，
 用于低空无线信道的射线追踪仿真：内置 Python 路损仿真器，并可一键导出

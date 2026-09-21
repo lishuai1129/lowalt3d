@@ -15,7 +15,7 @@ autolabel.py  ·  方向A：用预训练 SegFormer(ADE20K) 自动预标注 → �
 然后复核 masks_auto_color\，满意就：
   python scripts\assign_material.py ... --masks_dir data\scene01\material\masks_auto
 """
-import os, sys, glob, argparse
+import os, sys, glob, argparse, re
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,9 +40,9 @@ def build_lut(id2label, class_order):
     n = max(int(k) for k in id2label) + 1
     lut = np.full(n, bg, np.uint8)
     for ade_id, name in id2label.items():
-        nl = str(name).lower()
+        words = set(re.findall(r"[a-z]+", str(name).lower()))
         for cls, kws in _KEYWORDS.items():
-            if cls in idx and any(k in nl for k in kws):
+            if cls in idx and any(k in words for k in kws):
                 lut[int(ade_id)] = idx[cls]; break
     return lut
 
@@ -75,8 +75,9 @@ def main():
     if args.color:
         os.makedirs(args.out + "_color", exist_ok=True)
 
-    imgs = sorted(sum([glob.glob(os.path.join(args.images, e))
-                       for e in ("*.JPG", "*.jpg", "*.png", "*.PNG")], []))
+    imgs = sorted({os.path.normcase(os.path.abspath(p)): p
+                   for e in ("*.JPG", "*.jpg", "*.png", "*.PNG")
+                   for p in glob.glob(os.path.join(args.images, e))}.values())
     print(f"自动预标注 {len(imgs)} 张 ...")
     for k, ip in enumerate(imgs):
         im0 = cv2.cvtColor(cv2.imread(ip), cv2.COLOR_BGR2RGB); H, W = im0.shape[:2]

@@ -91,6 +91,7 @@ def main():
     np.add.at(vcount, Tri.reshape(-1), np.repeat(np.eye(K, dtype=np.float32)[face_mat], 3, axis=0))
     vmat = vcount.argmax(1)
     mesh.vertex_colors = o3d.utility.Vector3dVector(_PALETTE[np.clip(vmat, 0, len(_PALETTE)-1)] / 255.0)
+    mesh.compute_vertex_normals()
     ply_path = os.path.join(args.out_dir, "material_mesh.ply")
     o3d.io.write_triangle_mesh(ply_path, mesh)
     print(f"[导出] {ply_path}")

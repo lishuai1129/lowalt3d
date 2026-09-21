@@ -31,3 +31,4 @@ __pycache__/
 # ---- 文档与参考表（不入库）----
 docs/
 materials.csv
+reports/
