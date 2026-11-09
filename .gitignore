@@ -1,6 +1,8 @@
 # ---- 大数据 / 可再生产物（不入库）----
 data/
+data01/
 outputs/
+outputs01/
 experiments/
 checkpoints/
 
@@ -31,6 +33,7 @@ __pycache__/
 # ---- 文档与参考表（不入库）----
 docs/
 materials.csv
+reports/
 
 # SQLite 临时/WAL 残留(工具生成,勿入库)
 *.db
