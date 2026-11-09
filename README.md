@@ -149,7 +149,23 @@ python scripts\export_dae.py --mesh outputs\%SCENE%_pgsr_hq\mesh\tsdf_fusion_pos
 python scripts\export_gltf_ue.py --material_ply outputs\%SCENE%_pgsr_hq\material_win\material_mesh.ply ^
   --geo_transform outputs\%SCENE%_pgsr_hq\geo_transform.json ^
   --out_dir outputs\%SCENE%_pgsr_hq\ue --target_faces 300000
+
+:: 11) 【展示用】带照片纹理 + PBR 的分块 glb（UE 渲染；上一步只有纯色材质槽，供 RF 用）
+::     --images 必须是去畸变图（与 cameras.json 同一套）；降采样图会自动缩放内参
+python scripts\export_textured_ue.py --mesh outputs\%SCENE%_pgsr_hq\mesh\tsdf_fusion_post.ply ^
+  --materials outputs\%SCENE%_pgsr_hq\material_win\face_materials.csv ^
+  --cameras outputs\%SCENE%_pgsr_hq\cameras.json --images data\%SCENE%\images_2 ^
+  --geo_transform outputs\%SCENE%_pgsr_hq\geo_transform.json ^
+  --out_dir outputs\%SCENE%_pgsr_hq\ue_textured --target_faces 2000000 --tile_m 100 --tex 4096
 ```
+
+**UE 展示导出**（`export_textured_ue.py`，依赖 `pip install xatlas trimesh`）：按 ENU 米制分块 → xatlas 展 UV →
+逐纹素投影到可见照片（Open3D 深度图判遮挡，按入射角/分辨率/离边缘距离加权融合）→ 每块输出
+`tile.glb`（内嵌 BaseColor + metallicRoughness 贴图）、`basecolor.png`、`orm.png`、`material_id.png`、
+`collision.glb`，以及 `tiles.json`。PBR 值按材质类查 `configs/visual_pbr.yaml`（**视觉参数，与 P.2040 电磁表无关**）。
+所有块共用同一原点：UE 中 Uniform Scale 100 导入后全部放在世界原点即可拼合；开 Nanite；碰撞用 `collision.glb`。
+`--selfcheck` 用合成场景验证投影/遮挡/uv 约定（颜色误差中位 < 1/255）。
+已知局限：未做影像间曝光统一（色差大时会出现块状色斑）；植被/窗洞等网格空洞处没有纹理可贴。
 
 > **下游一律用 `material_win`**（裁决链输出），不要用第 7 步未清理的 `material_gauss_cons`——
 > 后者是原始票数，墙面有椒盐、屋顶有玻璃、metal 全是 argmax 噪声。
@@ -193,6 +209,7 @@ python scripts\export_gltf_ue.py --material_ply outputs\%SCENE%_pgsr_hq\material
 | `visualize_sim.py` | 路损/视距/射线 3D 可视化 |
 | `export_dae.py` | 导出 Wireless InSite `.city`/`.dae` + 材质表 |
 | `export_gltf_ue.py` | 导出 Cesium/UE `.glb` + 材质槽 + 地理锚点 |
+| `export_textured_ue.py` | 导出**带照片纹理 + PBR** 的分块 `.glb` + 碰撞网格（UE 视觉展示） |
 | `compare_engines.py` | Python ↔ UE 覆盖结果对比（RMSE/相关系数） |
 | `material_common.py` | 共用：类别表 / P.2040 电磁参数 / 调色板（**唯一真源**） |
 

@@ -1,0 +1,10 @@
+# 视觉 PBR 参数表（仅用于渲染展示，和 radio_params.yaml 的电磁参数互不相干）
+# 被 scripts/export_textured_ue.py 读取，写入 glTF metallicRoughness 贴图（G=roughness, B=metallic）。
+# 类别名必须与 configs/classes.txt 一致；缺失的类用 default。
+default:    {roughness: 0.85, metallic: 0.0}
+background: {roughness: 0.90, metallic: 0.0}
+vegetation: {roughness: 0.85, metallic: 0.0}
+asphalt:    {roughness: 0.90, metallic: 0.0}
+concrete:   {roughness: 0.80, metallic: 0.0}
+glass:      {roughness: 0.06, metallic: 0.0}   # 低粗糙度：Lumen 下反射天空；UE 中可再换成伪玻璃材质
+metal:      {roughness: 0.35, metallic: 0.9}

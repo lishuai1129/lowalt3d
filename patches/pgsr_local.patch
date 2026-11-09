@@ -1,0 +1,359 @@
+diff --git a/scene/gaussian_model.py b/scene/gaussian_model.py
+index e7a691c..38f2b57 100644
+--- a/scene/gaussian_model.py
++++ b/scene/gaussian_model.py
+@@ -20,7 +20,6 @@ from utils.sh_utils import RGB2SH
+ from simple_knn._C import distCUDA2
+ from utils.graphics_utils import BasicPointCloud
+ from utils.general_utils import strip_symmetric, build_scaling_rotation
+-from pytorch3d.transforms import quaternion_to_matrix
+ 
+ def dilate(bin_img, ksize=5):
+     pad = (ksize - 1) // 2
+@@ -158,7 +157,7 @@ class GaussianModel:
+         return normal_global
+     
+     def get_rotation_matrix(self):
+-        return quaternion_to_matrix(self.get_rotation)
++        return build_rotation(self.get_rotation)
+ 
+     def get_covariance(self, scaling_modifier = 1):
+         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
+@@ -554,4 +553,3 @@ class GaussianModel:
+         T = torch.tensor(fov_camera.T).float().cuda()
+         pts = (pts-T)@R.transpose(-1,-2)
+         return pts
+-    
+\ No newline at end of file
+diff --git a/scripts/preprocess/convert.py b/scripts/preprocess/convert.py
+index 64b1e77..4aca663 100644
+--- a/scripts/preprocess/convert.py
++++ b/scripts/preprocess/convert.py
+@@ -1,121 +1,158 @@
+ 
+-import os
+ import logging
+-from argparse import ArgumentParser
++import os
+ import shutil
++import subprocess
++from argparse import ArgumentParser
+ 
+-# This Python script is based on the shell converter script provided in the MipNerF 360 repository.
+-def init_colmap(args):
+-    colmap_command = '"{}"'.format(args.colmap_executable) if len(args.colmap_executable) > 0 else "colmap"
+-    magick_command = '"{}"'.format(args.magick_executable) if len(args.magick_executable) > 0 else "magick"
+-    use_gpu = 1 if not args.no_gpu else 0
+-    scene_list = os.listdir(args.data_path)
+-    for scene in scene_list:
+-        scene_path = os.path.join(args.data_path, scene)
+-        os.makedirs(scene_path + "/sparse", exist_ok=True)
+-
+-        os.system(f"rm -rf {scene_path}/images/*")
+-        os.system(f"rm -rf {scene_path}/sparse/*")
+-        os.system(f"rm {scene_path}/database.db")
+-
+-        ## Feature extraction
+-        feat_extracton_cmd = colmap_command + " feature_extractor "\
+-            "--database_path " + scene_path + "/database.db \
+-            --image_path " + scene_path + "/input \
+-            --ImageReader.single_camera 1 \
+-            --ImageReader.camera_model " + args.camera + " \
+-            --SiftExtraction.use_gpu " + str(use_gpu)
+-        exit_code = os.system(feat_extracton_cmd)
+-        if exit_code != 0:
+-            logging.error(f"Feature extraction failed with code {exit_code}. Exiting.")
+-            exit(exit_code)
+-
+-        ## Feature matching
+-        feat_matching_cmd = colmap_command + " exhaustive_matcher \
+-            --database_path " + scene_path + "/database.db \
+-            --SiftMatching.use_gpu " + str(use_gpu)
+-        exit_code = os.system(feat_matching_cmd)
+-        if exit_code != 0:
+-            logging.error(f"Feature matching failed with code {exit_code}. Exiting.")
+-            exit(exit_code)
+-
+-        ### Bundle adjustment
+-        # The default Mapper tolerance is unnecessarily large,
+-        # decreasing it speeds up bundle adjustment steps.
+-        mapper_cmd = (colmap_command + " mapper \
+-            --database_path " + scene_path + "/database.db \
+-            --image_path "  + scene_path + "/input \
+-            --output_path "  + scene_path + "/sparse \
+-            --Mapper.ba_global_function_tolerance=0.000001")
+-        exit_code = os.system(mapper_cmd) 
+-        if exit_code != 0:
+-            logging.error(f"Mapper failed with code {exit_code}. Exiting.")
+-            exit(exit_code)
+-
+-        files = os.listdir(scene_path + "/sparse/0")
+-        # Copy each file from the source directory to the destination directory
+-        for file in files:
+-            destination_file = os.path.join(scene_path, "sparse", file)
+-            source_file = os.path.join(scene_path, "sparse", "0", file)
+-            shutil.move(source_file, destination_file)
+-
+-        ### Image undistortion
+-        ## We need to undistort our images into ideal pinhole intrinsics.
+-        img_undist_cmd = (colmap_command + " image_undistorter \
+-            --image_path " + scene_path + "/input \
+-            --input_path " + scene_path + "/sparse \
+-            --output_path " + scene_path + "\
+-            --output_type COLMAP")
+-        exit_code = os.system(img_undist_cmd)
+-        if exit_code != 0:
+-            logging.error(f"Mapper failed with code {exit_code}. Exiting.")
+-            exit(exit_code)
+-
+-        if(args.resize):
+-            print("Copying and resizing...")
+-
+-            # Resize images.
+-            os.makedirs(scene + "/images_2", exist_ok=True)
+-            os.makedirs(scene + "/images_4", exist_ok=True)
+-            os.makedirs(scene + "/images_8", exist_ok=True)
+-            # Get the list of files in the source directory
+-            files = os.listdir(scene + "/images")
+-            # Copy each file from the source directory to the destination directory
+-            for file in files:
+-                source_file = os.path.join(scene, "images", file)
+-
+-                destination_file = os.path.join(scene, "images_2", file)
+-                shutil.copy2(source_file, destination_file)
+-                exit_code = os.system(magick_command + " mogrify -resize 50% " + destination_file)
+-                if exit_code != 0:
+-                    logging.error(f"50% resize failed with code {exit_code}. Exiting.")
+-                    exit(exit_code)
+ 
+-                destination_file = os.path.join(scene, "images_4", file)
++def run_command(command, step):
++    """Run a command and stop on the first failure."""
++    print(f"\n[{step}] {subprocess.list2cmdline(command)}")
++    try:
++        subprocess.run(command, check=True)
++    except FileNotFoundError as exc:
++        raise RuntimeError(f"{step} failed: executable not found: {command[0]}") from exc
++    except subprocess.CalledProcessError as exc:
++        raise RuntimeError(f"{step} failed with exit code {exc.returncode}") from exc
++
++
++def reset_output(path):
++    """Remove a previous generated output and recreate its directory."""
++    if os.path.isdir(path):
++        shutil.rmtree(path)
++    elif os.path.exists(path):
++        os.remove(path)
++    os.makedirs(path, exist_ok=True)
++
++
++def find_scenes(data_path):
++    """Accept either one scene directory or a parent containing scenes."""
++    data_path = os.path.abspath(data_path)
++    if os.path.isdir(os.path.join(data_path, "input")):
++        return [data_path]
++
++    scenes = []
++    for name in sorted(os.listdir(data_path)):
++        scene_path = os.path.join(data_path, name)
++        if os.path.isdir(os.path.join(scene_path, "input")):
++            scenes.append(scene_path)
++    return scenes
++
++
++def preprocess_scene(scene_path, args):
++    colmap = args.colmap_executable or "colmap"
++    use_gpu = "0" if args.no_gpu else "1"
++    input_path = os.path.join(scene_path, "input")
++    database_path = os.path.join(scene_path, "database.db")
++    sparse_path = os.path.join(scene_path, "sparse")
++    images_path = os.path.join(scene_path, "images")
++
++    input_images = [
++        name for name in os.listdir(input_path)
++        if os.path.isfile(os.path.join(input_path, name))
++        and os.path.splitext(name)[1].lower()
++        in {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
++    ]
++    if not input_images:
++        raise RuntimeError(f"No images found in {input_path}")
++
++    print(f"\n=== Scene: {scene_path} ({len(input_images)} images) ===")
++
++    # Rebuild generated files while preserving the original input images.
++    if os.path.exists(database_path):
++        os.remove(database_path)
++    reset_output(sparse_path)
++    if os.path.exists(images_path):
++        reset_output(images_path)
++
++    run_command([
++        colmap, "feature_extractor",
++        "--database_path", database_path,
++        "--image_path", input_path,
++        "--ImageReader.single_camera", "1",
++        "--ImageReader.camera_model", args.camera,
++        "--FeatureExtraction.use_gpu", use_gpu,
++    ], "Feature extraction")
++
++    run_command([
++        colmap, "exhaustive_matcher",
++        "--database_path", database_path,
++        "--FeatureMatching.use_gpu", use_gpu,
++    ], "Feature matching")
++
++    run_command([
++        colmap, "mapper",
++        "--database_path", database_path,
++        "--image_path", input_path,
++        "--output_path", sparse_path,
++        "--Mapper.ba_global_function_tolerance", "0.000001",
++    ], "Sparse reconstruction")
++
++    model_path = os.path.join(sparse_path, "0")
++    if not os.path.isdir(model_path):
++        raise RuntimeError(
++            f"COLMAP did not create {model_path}. "
++            "Check whether enough images were registered."
++        )
++    for name in os.listdir(model_path):
++        shutil.move(os.path.join(model_path, name), os.path.join(sparse_path, name))
++    os.rmdir(model_path)
++
++    run_command([
++        colmap, "image_undistorter",
++        "--image_path", input_path,
++        "--input_path", sparse_path,
++        "--output_path", scene_path,
++        "--output_type", "COLMAP",
++    ], "Image undistortion")
++
++    if args.resize:
++        magick = args.magick_executable or "magick"
++        source_images = os.path.join(scene_path, "images")
++        for factor, percent in ((2, "50%"), (4, "25%"), (8, "12.5%")):
++            destination = os.path.join(scene_path, f"images_{factor}")
++            reset_output(destination)
++            for name in os.listdir(source_images):
++                source_file = os.path.join(source_images, name)
++                if not os.path.isfile(source_file):
++                    continue
++                destination_file = os.path.join(destination, name)
+                 shutil.copy2(source_file, destination_file)
+-                exit_code = os.system(magick_command + " mogrify -resize 25% " + destination_file)
+-                if exit_code != 0:
+-                    logging.error(f"25% resize failed with code {exit_code}. Exiting.")
+-                    exit(exit_code)
++                run_command(
++                    [magick, "mogrify", "-resize", percent, destination_file],
++                    f"Resize {name} to 1/{factor}",
++                )
+ 
+-                destination_file = os.path.join(args.source_path, "images_8", file)
+-                shutil.copy2(source_file, destination_file)
+-                exit_code = os.system(magick_command + " mogrify -resize 12.5% " + destination_file)
+-                if exit_code != 0:
+-                    logging.error(f"12.5% resize failed with code {exit_code}. Exiting.")
+-                    exit(exit_code)
+-
+-if __name__ == '__main__':
+-    parser = ArgumentParser()
+-    parser = ArgumentParser("Colmap converter")
+-    parser.add_argument('--data_path', type=str, default=None, help='Path to dataset')
+-    parser.add_argument("--no_gpu", action='store_true')
++
++def init_colmap(args):
++    scenes = find_scenes(args.data_path)
++    if not scenes:
++        raise RuntimeError(
++            "No scene containing an input directory was found under "
++            f"{os.path.abspath(args.data_path)}"
++        )
++    for scene_path in scenes:
++        preprocess_scene(scene_path, args)
++
++
++if __name__ == "__main__":
++    parser = ArgumentParser("COLMAP converter for PGSR")
++    parser.add_argument(
++        "--data_path", required=True,
++        help="A scene directory containing input/, or its parent directory",
++    )
++    parser.add_argument("--no_gpu", action="store_true")
+     parser.add_argument("--camera", default="OPENCV", type=str)
+     parser.add_argument("--colmap_executable", default="", type=str)
+     parser.add_argument("--resize", action="store_true")
+     parser.add_argument("--magick_executable", default="", type=str)
+     args = parser.parse_args()
+ 
+-    init_colmap(args)
++    try:
++        init_colmap(args)
++    except (OSError, RuntimeError) as exc:
++        logging.error(str(exc))
++        raise SystemExit(1)
+ 
+     print("Done.")
+diff --git a/train.py b/train.py
+index 29508f0..2a2dce8 100644
+--- a/train.py
++++ b/train.py
+@@ -8,7 +8,6 @@
+ #
+ # For inquiries contact  george.drettakis@inria.fr
+ #
+-
+ import os
+ from datetime import datetime
+ import torch
+@@ -78,7 +77,7 @@ def gen_virtul_cam(cam, trans_noise=1.0, deg_noise=15.0):
+                         preload_img=False, data_device = "cuda")
+     return virtul_cam
+ 
+-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
++def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, extent_override=None):
+     first_iter = 0
+     tb_writer = prepare_output_and_logger(dataset)
+     # backup main code
+@@ -95,14 +94,21 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
+ 
+     gaussians = GaussianModel(dataset.sh_degree)
+     scene = Scene(dataset, gaussians)
++    if extent_override:
++        # 分块训练：各块 cameras_extent 按自己的相机算，块越窄致密化尺度越细；统一成整场景的值。
++        # 续跑时位置学习率仍取检查点里存的 spatial_lr_scale，所以要从头训练才完全生效。
++        print(f"cameras_extent {scene.cameras_extent:.4f} -> {extent_override:.4f} (--extent_override)")
++        scene.cameras_extent = extent_override
++        gaussians.spatial_lr_scale = extent_override
+     gaussians.training_setup(opt)
+ 
+     app_model = AppModel()
+     app_model.train()
+     app_model.cuda()
+-    
++
+     if checkpoint:
+-        (model_params, first_iter) = torch.load(checkpoint)
++        # 检查点含 numpy 标量，PyTorch>=2.6 默认 weights_only=True 会拒绝加载
++        (model_params, first_iter) = torch.load(checkpoint, weights_only=False)
+         gaussians.restore(model_params, opt)
+         app_model.load_weights(scene.model_path)
+ 
+@@ -483,6 +489,8 @@ if __name__ == "__main__":
+     parser.add_argument("--quiet", action="store_true")
+     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
+     parser.add_argument("--start_checkpoint", type=str, default = None)
++    parser.add_argument("--extent_override", type=float, default=None,
++                        help="用整场景的 cameras_extent 代替本块自己算的值（分块训练用）")
+     args = parser.parse_args(sys.argv[1:])
+     args.save_iterations.append(args.iterations)
+     
+@@ -494,7 +502,7 @@ if __name__ == "__main__":
+     # Start GUI server, configure and run training
+     # network_gui.init(args.ip, args.port)
+     torch.autograd.set_detect_anomaly(args.detect_anomaly)
+-    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
++    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.extent_override)
+ 
+     # All done
+     print("\nTraining complete.")
